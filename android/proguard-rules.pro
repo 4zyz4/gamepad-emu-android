@@ -1,0 +1,1 @@
+-keepclassmembers class com.zyz4.gamepademu.proto.** { *; }

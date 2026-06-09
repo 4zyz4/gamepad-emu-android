@@ -1,0 +1,424 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:baselineAligned="false"
+    android:orientation="horizontal"
+    android:background="@color/bg_dark">
+
+    <!-- ── Left Sidebar ── -->
+    <LinearLayout
+        android:layout_width="120dp"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:background="@color/bg_surface"
+        android:paddingTop="16dp">
+
+        <Button
+            android:id="@+id/btnSettingsBack"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:background="?android:attr/selectableItemBackground"
+            android:text="返回"
+            android:drawableLeft="@drawable/ic_back"
+            android:paddingStart="8dp"
+            android:textColor="@color/text_primary"
+            android:textSize="13sp"
+            android:stateListAnimator="@null" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#444"
+            android:layout_marginVertical="8dp" />
+        
+        <Button
+            android:id="@+id/btnCategoryConnection"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:gravity="center"
+            android:paddingHorizontal="8dp"
+            android:text="连接"
+            android:textColor="@color/text_secondary"
+            android:textSize="13sp"
+            android:stateListAnimator="@null" />
+
+        <Button
+            android:id="@+id/btnCategoryPresets"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:gravity="center"
+            android:paddingHorizontal="8dp"
+            android:text="布局"
+            android:textColor="@color/text_primary"
+            android:textSize="13sp"
+            android:stateListAnimator="@null" />
+
+    </LinearLayout>
+
+    <!-- ── Right Content ── -->
+    <FrameLayout
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:padding="16dp">
+
+        <!-- Page 1: 布局预设 + 手柄设置 (merged) -->
+        <ScrollView
+            android:id="@+id/pagePresets"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="visible">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <!-- Display Mode (from pageController) -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="手柄显示"
+                    android:textColor="@color/text_primary"
+                    android:textSize="14sp"
+                    android:fontFamily="sans-serif-medium"
+                    android:layout_marginBottom="8dp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center"
+                    android:layout_marginBottom="16dp">
+
+                    <Button
+                        android:id="@+id/btnDisplayXbox"
+                        style="@style/GamepadChip"
+                        android:layout_marginEnd="6dp"
+                        android:text="XBOX" />
+
+                    <Button
+                        android:id="@+id/btnDisplayPlaystation"
+                        style="@style/GamepadChip"
+                        android:layout_marginEnd="6dp"
+                        android:text="PLAYSTATION" />
+
+                    <Button
+                        android:id="@+id/btnDisplaySwitch"
+                        style="@style/GamepadChip"
+                        android:text="SWITCH" />
+                </LinearLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#444"
+                    android:layout_marginBottom="12dp" />
+
+                <!-- Presets -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="布局预设"
+                    android:textColor="@color/text_primary"
+                    android:textSize="18sp"
+                    android:fontFamily="sans-serif-medium"
+                    android:layout_marginBottom="12dp" />
+
+                <!-- Edit Mode Toggle -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:background="@color/bg_surface"
+                    android:paddingHorizontal="12dp"
+                    android:layout_marginBottom="8dp">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="编辑布局"
+                        android:textColor="@color/text_primary"
+                        android:textSize="14sp" />
+
+                    <Switch
+                        android:id="@+id/switchEditMode"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/tvCurrentPreset"
+                    android:layout_width="match_parent"
+                    android:layout_height="36dp"
+                    android:gravity="center_vertical"
+                    android:paddingHorizontal="12dp"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="13sp"
+                    android:layout_marginBottom="8dp" />
+
+                <!-- Preset Cards Grid -->
+                <GridView
+                    android:id="@+id/gridPresets"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:numColumns="3"
+                    android:horizontalSpacing="6dp"
+                    android:verticalSpacing="6dp"
+                    android:stretchMode="columnWidth"
+                    android:layout_marginBottom="8dp" />
+
+                <!-- Action buttons -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center"
+                    android:layout_marginBottom="4dp">
+
+                    <Button
+                        android:id="@+id/btnPresetNew"
+                        style="@style/GamepadChip"
+                        android:text="新建布局"
+                        android:layout_marginEnd="6dp" />
+
+                    <Button
+                        android:id="@+id/btnPresetImport"
+                        style="@style/GamepadChip"
+                        android:text="导入布局"
+                        android:layout_marginEnd="6dp" />
+
+                    <Button
+                        android:id="@+id/btnPresetExport"
+                        style="@style/GamepadChip"
+                        android:text="导出布局" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center"
+                    android:layout_marginBottom="8dp">
+
+                    <Button
+                        android:id="@+id/btnPresetRename"
+                        style="@style/GamepadChip"
+                        android:text="重命名"
+                        android:layout_marginEnd="6dp" />
+
+                    <Button
+                        android:id="@+id/btnPresetDelete"
+                        style="@style/GamepadChip"
+                        android:text="删除" />
+                </LinearLayout>
+            </LinearLayout>
+        </ScrollView>
+
+        <!-- Page 2: 连接 -->
+        <ScrollView
+            android:id="@+id/pageConnection"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="连接"
+                    android:textColor="@color/text_primary"
+                    android:textSize="18sp"
+                    android:fontFamily="sans-serif-medium"
+                    android:layout_marginBottom="16dp" />
+
+                <!-- Connection Mode -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="连接方式"
+                    android:textColor="@color/text_primary"
+                    android:textSize="14sp"
+                    android:fontFamily="sans-serif-medium"
+                    android:layout_marginBottom="8dp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center"
+                    android:layout_marginBottom="16dp">
+
+                    <Button
+                        android:id="@+id/btnConnWifi"
+                        style="@style/GamepadChip"
+                        android:layout_marginEnd="6dp"
+                        android:text="WiFi" />
+
+                    <Button
+                        android:id="@+id/btnConnBluetooth"
+                        style="@style/GamepadChip"
+                        android:text="蓝牙" />
+                </LinearLayout>
+
+                <!-- Target Platform (conditional: Bluetooth) -->
+                <LinearLayout
+                    android:id="@+id/sectionTargetPlatform"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="目标平台"
+                        android:textColor="@color/text_primary"
+                        android:textSize="14sp"
+                        android:fontFamily="sans-serif-medium"
+                        android:layout_marginBottom="8dp" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center"
+                        android:layout_marginBottom="16dp">
+
+                        <Button
+                            android:id="@+id/btnTargetWindows"
+                            style="@style/GamepadChip"
+                            android:layout_marginEnd="6dp"
+                            android:text="WINDOWS" />
+
+                        <Button
+                            android:id="@+id/btnTargetAndroid"
+                            style="@style/GamepadChip"
+                            android:text="ANDROID" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <!-- Server Status -->
+                <TextView
+                    android:id="@+id/tvConnectionStatus"
+                    android:layout_width="match_parent"
+                    android:layout_height="40dp"
+                    android:gravity="center"
+                    android:text="未启动"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="14sp"
+                    android:background="@color/bg_surface"
+                    android:layout_marginBottom="12dp" />
+
+                <!-- Start / Stop Server -->
+                <Button
+                    android:id="@+id/btnConnectAction"
+                    android:layout_width="match_parent"
+                    android:layout_height="44dp"
+                    android:background="@drawable/bg_small_btn"
+                    android:text="启动服务"
+                    android:textColor="@color/text_primary"
+                    android:textSize="14sp"
+                    android:stateListAnimator="@null"
+                    android:layout_marginBottom="8dp" />
+
+                <!-- Unpair Device -->
+                <LinearLayout
+                    android:id="@+id/sectionPairedDevice"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:layout_marginBottom="8dp"
+                    android:visibility="gone">
+
+                    <TextView
+                        android:id="@+id/tvPairedDeviceName"
+                        android:layout_width="match_parent"
+                        android:layout_height="30dp"
+                        android:gravity="center_vertical"
+                        android:paddingHorizontal="12dp"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="13sp" />
+
+                    <Button
+                        android:id="@+id/btnUnpairDevice"
+                        android:layout_width="match_parent"
+                        android:layout_height="40dp"
+                        android:background="@drawable/bg_small_btn"
+                        android:text="取消配对"
+                        android:textColor="#FF5252"
+                        android:textSize="14sp"
+                        android:stateListAnimator="@null" />
+                </LinearLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#444"
+                    android:layout_marginBottom="16dp" />
+
+                <!-- Broadcast / Server Info -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="服务信息"
+                    android:textColor="@color/text_primary"
+                    android:textSize="14sp"
+                    android:fontFamily="sans-serif-medium"
+                    android:layout_marginBottom="8dp" />
+
+                <TextView
+                    android:id="@+id/tvServerIp"
+                    android:layout_width="match_parent"
+                    android:layout_height="36dp"
+                    android:gravity="center_vertical"
+                    android:paddingHorizontal="12dp"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="13sp"
+                    android:background="@color/bg_surface"
+                    android:layout_marginBottom="4dp" />
+
+                <TextView
+                    android:id="@+id/tvBroadcastStatus"
+                    android:layout_width="match_parent"
+                    android:layout_height="36dp"
+                    android:gravity="center_vertical"
+                    android:paddingHorizontal="12dp"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="13sp"
+                    android:background="@color/bg_surface"
+                    android:layout_marginBottom="16dp" />
+
+                <!-- Port -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="端口"
+                    android:textColor="@color/text_primary"
+                    android:textSize="13sp"
+                    android:layout_marginBottom="4dp" />
+
+                <EditText
+                    android:id="@+id/etPort"
+                    android:layout_width="match_parent"
+                    android:layout_height="40dp"
+                    android:background="@color/bg_surface"
+                    android:textColor="@color/text_primary"
+                    android:textColorHint="@color/text_secondary"
+                    android:hint="端口 (默认 37284)"
+                    android:paddingHorizontal="12dp"
+                    android:singleLine="true"
+                    android:inputType="number"
+                    android:layout_marginBottom="8dp" />
+            </LinearLayout>
+        </ScrollView>
+
+    </FrameLayout>
+</LinearLayout>

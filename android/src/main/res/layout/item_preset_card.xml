@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="3dp">
+
+    <FrameLayout
+        android:id="@+id/cardBackground"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_chip"
+        android:clickable="true"
+        android:focusable="true"
+        android:padding="4dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <com.zyz4.gamepademu.view.PresetPreviewView
+                android:id="@+id/presetPreview"
+                android:layout_width="match_parent"
+                android:layout_height="90dp"
+                android:background="#FF1A1A1A" />
+
+            <TextView
+                android:id="@+id/presetName"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:textColor="@color/text_primary"
+                android:textSize="11sp"
+                android:paddingVertical="4dp"
+                android:maxLines="1"
+                android:ellipsize="end" />
+        </LinearLayout>
+    </FrameLayout>
+</LinearLayout>

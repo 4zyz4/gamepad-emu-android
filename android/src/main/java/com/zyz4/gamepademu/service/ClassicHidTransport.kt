@@ -1,0 +1,330 @@
+package com.zyz4.gamepademu.service
+
+import android.annotation.SuppressLint
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothHidDevice
+import android.bluetooth.BluetoothHidDeviceAppSdpSettings
+import android.bluetooth.BluetoothHidDeviceAppQosSettings
+import android.bluetooth.BluetoothManager
+import android.bluetooth.BluetoothProfile
+import android.content.Context
+import android.content.Intent
+import android.os.Build
+import com.zyz4.gamepademu.data.PairingStateRepository
+import com.zyz4.gamepademu.model.AppSettings
+import com.zyz4.gamepademu.model.TargetPlatform
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import java.util.concurrent.Executors
+
+@SuppressLint("MissingPermission")
+class ClassicHidTransport(
+    private val context: Context,
+    private val pairingStateRepository: PairingStateRepository,
+) : BluetoothHidService {
+
+    private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+
+    private val bluetoothManager: BluetoothManager by lazy {
+        context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
+    }
+    private val bluetoothAdapter: BluetoothAdapter by lazy {
+        bluetoothManager.adapter
+    }
+
+    private var hidDevice: BluetoothHidDevice? = null
+    private var connectedDevice: BluetoothDevice? = null
+    private var lastReport: ByteArray = ByteArray(7)
+    private var currentSettings: AppSettings? = null
+    private var onOutputReport: ((ByteArray) -> Unit)? = null
+
+    override val transportType: BluetoothTransportType = BluetoothTransportType.CLASSIC
+
+    private val _connectionPhase = MutableStateFlow(ConnectionPhase.IDLE)
+    override val connectionPhase: StateFlow<ConnectionPhase> = _connectionPhase.asStateFlow()
+
+    private val deviceCallback by lazy {
+        object : BluetoothHidDevice.Callback() {
+            override fun onAppStatusChanged(pluggedDevice: BluetoothDevice?, registered: Boolean) {
+                if (registered) {
+                    scope.launch { tryAutoReconnect() }
+                } else {
+                    _connectionPhase.value = ConnectionPhase.ERROR
+                }
+            }
+
+            override fun onConnectionStateChanged(device: BluetoothDevice, state: Int) {
+                when (state) {
+                    BluetoothProfile.STATE_CONNECTED -> {
+                        connectedDevice = device
+                        _connectionPhase.value = ConnectionPhase.CONNECTED
+                        scope.launch { pairingStateRepository.savePairedDevice(device) }
+                    }
+                    BluetoothProfile.STATE_DISCONNECTED -> {
+                        if (_connectionPhase.value == ConnectionPhase.RECONNECTING) {
+                            connectedDevice = null
+                            enterDiscoverable()
+                            _connectionPhase.value = ConnectionPhase.DISCOVERABLE
+                        } else {
+                            connectedDevice = null
+                            enterDiscoverable()
+                            _connectionPhase.value = ConnectionPhase.DISCOVERABLE
+                        }
+                    }
+                }
+            }
+
+            override fun onGetReport(device: BluetoothDevice, type: Byte, id: Byte, bufferSize: Int) {
+                val size = bufferSize.coerceIn(1, 64)
+                val data = lastReport.copyOf(size)
+                try {
+                    hidDevice?.replyReport(device, type, id, data)
+                } catch (_: Exception) {}
+            }
+
+            override fun onSetReport(device: BluetoothDevice, type: Byte, id: Byte, data: ByteArray) {
+                onOutputReport?.invoke(data)
+            }
+
+            override fun onSetProtocol(device: BluetoothDevice, protocol: Byte) {}
+
+            override fun onVirtualCableUnplug(device: BluetoothDevice) {
+                connectedDevice = null
+                enterDiscoverable()
+                _connectionPhase.value = ConnectionPhase.DISCOVERABLE
+            }
+        }
+    }
+
+    private val profileListener = object : BluetoothProfile.ServiceListener {
+        override fun onServiceConnected(profile: Int, proxy: BluetoothProfile) {
+            hidDevice = proxy as BluetoothHidDevice
+            registerApp()
+        }
+
+        override fun onServiceDisconnected(profile: Int) {
+            hidDevice = null
+        }
+    }
+
+    override fun start(settings: AppSettings, onOutputReport: (ByteArray) -> Unit) {
+        if (!isBluetoothEnabled()) {
+            _connectionPhase.value = ConnectionPhase.ERROR
+            return
+        }
+        this.onOutputReport = onOutputReport
+        currentSettings = settings
+        _connectionPhase.value = ConnectionPhase.REGISTERING_PROFILE
+        bluetoothAdapter.getProfileProxy(context, profileListener, BluetoothProfile.HID_DEVICE)
+    }
+
+    override fun sendReport(report: ByteArray) {
+        val device = connectedDevice ?: return
+        val hid = hidDevice ?: return
+        lastReport = report
+        try {
+            hid.sendReport(device, 1, report)
+        } catch (_: Exception) {}
+    }
+
+    override fun stop() {
+        try {
+            hidDevice?.unregisterApp()
+        } catch (_: Exception) {}
+        hidDevice?.let {
+            bluetoothAdapter.closeProfileProxy(BluetoothProfile.HID_DEVICE, it)
+        }
+        hidDevice = null
+        connectedDevice = null
+        onOutputReport = null
+        _connectionPhase.value = ConnectionPhase.IDLE
+    }
+
+    private fun isBluetoothEnabled(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return false
+        return bluetoothAdapter?.isEnabled == true
+    }
+
+    private suspend fun tryAutoReconnect() {
+        val address = pairingStateRepository.getPairedDeviceAddress()
+        if (address != null) {
+            try {
+                val device = bluetoothAdapter.getRemoteDevice(address)
+                _connectionPhase.value = ConnectionPhase.RECONNECTING
+                val ok = hidDevice?.connect(device) ?: false
+                if (!ok) {
+                    enterDiscoverable()
+                    _connectionPhase.value = ConnectionPhase.DISCOVERABLE
+                }
+            } catch (e: IllegalArgumentException) {
+                enterDiscoverable()
+                _connectionPhase.value = ConnectionPhase.DISCOVERABLE
+            }
+        } else {
+            enterDiscoverable()
+            _connectionPhase.value = ConnectionPhase.DISCOVERABLE
+        }
+    }
+
+    private fun registerApp() {
+        val subclass: Byte = 0x02
+        val desc = if (currentSettings?.targetPlatform == TargetPlatform.ANDROID) {
+            ANDROID_HID_DESCRIPTOR
+        } else {
+            HID_DESCRIPTOR
+        }
+        val sdp = BluetoothHidDeviceAppSdpSettings(
+            "Gamepad Emu",
+            "Virtual Xbox 360 Controller",
+            "Gamepad Emu",
+            subclass,
+            desc,
+        )
+        val qos = BluetoothHidDeviceAppQosSettings(
+            BluetoothHidDeviceAppQosSettings.SERVICE_BEST_EFFORT,
+            0, 0, 0, 0, 0,
+        )
+        try {
+            hidDevice?.registerApp(sdp, qos, qos, Executors.newSingleThreadExecutor(), deviceCallback)
+        } catch (e: Exception) {
+            _connectionPhase.value = ConnectionPhase.ERROR
+        }
+    }
+
+    private fun enterDiscoverable() {
+        val hasPairedDevice = runCatching {
+            bluetoothAdapter.bondedDevices.isNotEmpty()
+        }.getOrDefault(false)
+        if (!hasPairedDevice) {
+            try {
+                val intent = Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE).apply {
+                    putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 300)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(intent)
+            } catch (_: Exception) {}
+        }
+    }
+
+    private companion object {
+        private fun b(v: Int) = v.toByte()
+
+        /** 11‑byte report for Windows/Apple Classic (matches XInput layout). */
+        private val HID_DESCRIPTOR = byteArrayOf(
+            b(0x05), b(0x01),       // Usage Page (Generic Desktop)
+            b(0x09), b(0x05),       // Usage (Game Pad)
+            b(0xA1), b(0x01),       // Collection (Application)
+            b(0x85), b(0x01),       //   Report ID (1)
+
+            // Buttons (17 buttons + 7 padding = 24 bits / 3 bytes)
+            b(0x05), b(0x09),       //   Usage Page (Button)
+            b(0x19), b(0x01),       //   Usage Minimum (1)
+            b(0x29), b(0x11),       //   Usage Maximum (17)
+            b(0x15), b(0x00),       //   Logical Minimum (0)
+            b(0x25), b(0x01),       //   Logical Maximum (1)
+            b(0x75), b(0x01),       //   Report Size (1)
+            b(0x95), b(0x11),       //   Report Count (17)
+            b(0x81), b(0x02),       //   Input (Data,Var,Abs)
+
+            b(0x75), b(0x01),       //   Report Size (1)
+            b(0x95), b(0x07),       //   Report Count (7)
+            b(0x81), b(0x01),       //   Input (Const)
+
+            // Axes (LX, LY, RX, RY - 4 x 16-bit = 8 bytes)
+            b(0x05), b(0x01),       //   Usage Page (Generic Desktop)
+            b(0x09), b(0x30),       //   Usage (X)  → LX
+            b(0x09), b(0x31),       //   Usage (Y)  → LY
+            b(0x09), b(0x32),       //   Usage (Z)  → RX
+            b(0x09), b(0x33),       //   Usage (Ry) → RY
+            b(0x16), b(0x00), b(0x80),  // Logical Minimum (-32768)
+            b(0x26), b(0xFF), b(0x7F),  // Logical Maximum (32767)
+            b(0x75), b(0x10),       //   Report Size (16)
+            b(0x95), b(0x04),       //   Report Count (4)
+            b(0x81), b(0x02),       //   Input (Data,Var,Abs)
+
+            b(0xC0),                // End Collection
+        )
+
+        /**
+         * 7‑byte report for Android Classic.
+         *   byte  0    Buttons 1‑8 (bits 0‑7)
+         *   byte  1    Buttons 9‑12 (bits 0‑3) + padding (bits 4‑7)
+         *   byte  2    Hat switch (bits 0‑3) + padding (bits 4‑7)
+         *   byte  3    LX (s8)
+         *   byte  4    LY (s8)
+         *   byte  5    Z / RX (s8)
+         *   byte  6    Rz / RY (s8)
+         */
+        private val ANDROID_HID_DESCRIPTOR = byteArrayOf(
+            b(0x05), b(0x01),           // Usage Page (Generic Desktop Ctrls)
+            b(0x09), b(0x05),           // Usage (Game Pad)
+            b(0xA1), b(0x01),           // Collection (Application)
+
+            // Byte 0: Buttons 1‑8
+            b(0x05), b(0x09),           //   Usage Page (Button)
+            b(0x09), b(0x01),           //   Usage (Button 1) A
+            b(0x09), b(0x02),           //   Usage (Button 2) B
+            b(0x09), b(0x04),           //   Usage (Button 4) X
+            b(0x09), b(0x05),           //   Usage (Button 5) Y
+            b(0x09), b(0x09),           //   Usage (Button 9) TL2/LB
+            b(0x09), b(0x0A),           //   Usage (Button 10) TR2/RB
+            b(0x09), b(0x07),           //   Usage (Button 7) TL/LT
+            b(0x09), b(0x08),           //   Usage (Button 8) TR/RT
+            b(0x15), b(0x00),           //   Logical Minimum (0)
+            b(0x25), b(0x01),           //   Logical Maximum (1)
+            b(0x75), b(0x01),           //   Report Size (1)
+            b(0x95), b(0x08),           //   Report Count (8)
+            b(0x81), b(0x02),           //   Input (Data,Var,Abs)
+
+            // Byte 1 lo‑nibble: Buttons 9‑12
+            b(0x09), b(0x0B),           //   Usage (Button 11) SELECT
+            b(0x09), b(0x0C),           //   Usage (Button 12) START
+            b(0x09), b(0x0E),           //   Usage (Button 14) L3
+            b(0x09), b(0x0F),           //   Usage (Button 15) R3
+            b(0x75), b(0x01),           //   Report Size (1)
+            b(0x95), b(0x04),           //   Report Count (4)
+            b(0x81), b(0x02),           //   Input (Data,Var,Abs)
+
+            // Byte 1 hi‑nibble: padding
+            b(0x75), b(0x01),           //   Report Size (1)
+            b(0x95), b(0x04),           //   Report Count (4)
+            b(0x81), b(0x01),           //   Input (Const)
+
+            // Byte 2 lo‑nibble: Hat switch
+            b(0x05), b(0x01),           //   Usage Page (Generic Desktop Ctrls)
+            b(0x09), b(0x39),           //   Usage (Hat switch)
+            b(0x15), b(0x00),           //   Logical Minimum (0)
+            b(0x25), b(0x08),           //   Logical Maximum (8)
+            b(0x35), b(0x00),           //   Physical Minimum (0)
+            b(0x46), b(0x3B), b(0x01),  //   Physical Maximum (315)
+            b(0x65), b(0x14),           //   Unit (Eng Rot: Degree)
+            b(0x75), b(0x04),           //   Report Size (4)
+            b(0x95), b(0x01),           //   Report Count (1)
+            b(0x81), b(0x02),           //   Input (Data,Var,Abs)
+
+            // Byte 2 hi‑nibble: padding
+            b(0x75), b(0x04),           //   Report Size (4)
+            b(0x95), b(0x01),           //   Report Count (1)
+            b(0x81), b(0x01),           //   Input (Const)
+
+            // Bytes 3‑6: Axes (X,Y,Z,Rz) 4 × s8
+            b(0x05), b(0x01),           //   Usage Page (Generic Desktop Ctrls)
+            b(0x15), b(0x81),           //   Logical Minimum (-127)
+            b(0x25), b(0x7F),           //   Logical Maximum (127)
+            b(0x09), b(0x30),           //   Usage (X)  → LX
+            b(0x09), b(0x31),           //   Usage (Y)  → LY
+            b(0x09), b(0x32),           //   Usage (Z)  → RX
+            b(0x09), b(0x35),           //   Usage (Rz) → RY
+            b(0x75), b(0x08),           //   Report Size (8)
+            b(0x95), b(0x04),           //   Report Count (4)
+            b(0x81), b(0x02),           //   Input (Data,Var,Abs)
+            b(0xC0),                    // End Collection
+        )
+    }
+}
