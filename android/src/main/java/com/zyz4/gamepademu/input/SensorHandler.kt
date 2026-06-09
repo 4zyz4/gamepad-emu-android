@@ -84,7 +84,7 @@ class SensorHandler(private val context: Context) : SensorEventListener {
         rawX: Float, rawY: Float, rawZ: Float,
     ): Triple<Float, Float, Float> {
         // gyroX→俯仰(短轴), gyroY→偏航(法线), gyroZ→横滚(长轴)
-        return Triple(rawY, rawZ, rawX)
+        return Triple(-rawY, rawZ,-rawX)
     }
 
     override fun onSensorChanged(event: SensorEvent) {
