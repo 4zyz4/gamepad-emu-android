@@ -375,7 +375,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun selectSettingsCategory(index: Int) {
-        val pages = listOf(R.id.pagePresets, R.id.pageConnection)
+        val pages = listOf(R.id.pageConnection, R.id.pagePresets)
         val buttons = listOf(
             R.id.btnCategoryPresets, R.id.btnCategoryConnection
         )
@@ -393,8 +393,8 @@ class MainActivity : ComponentActivity() {
         findViewById<Button>(R.id.btnSettingsBack).setOnClickListener { hideSettings() }
 
         // Category switching
-        findViewById<Button>(R.id.btnCategoryPresets).setOnClickListener { selectSettingsCategory(0) }
-        findViewById<Button>(R.id.btnCategoryConnection).setOnClickListener { selectSettingsCategory(1) }
+        findViewById<Button>(R.id.btnCategoryConnection).setOnClickListener { selectSettingsCategory(0) }
+        findViewById<Button>(R.id.btnCategoryPresets).setOnClickListener { selectSettingsCategory(1) }
 
         // ── Presets page ──
         findViewById<Switch>(R.id.switchEditMode).setOnCheckedChangeListener { _, isChecked ->
