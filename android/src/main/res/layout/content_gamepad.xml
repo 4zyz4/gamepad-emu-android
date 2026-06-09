@@ -212,14 +212,14 @@
     <!-- Edit mode toolbar (visible in edit mode) -->
     <LinearLayout
         android:id="@+id/editToolbar"
-        android:layout_width="match_parent"
+        android:layout_width="200dp"
         android:layout_height="36dp"
         android:background="#CC1A1A1A"
         android:gravity="center"
         android:orientation="horizontal"
         android:paddingHorizontal="12dp"
         android:visibility="gone"
-        android:layout_gravity="top">
+        android:layout_gravity="center_horizontal|top">
 
         <Button
             android:id="@+id/btnEditSave"
