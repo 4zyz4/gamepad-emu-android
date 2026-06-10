@@ -12,10 +12,3 @@ enum class ConnectionPhase {
     DISCONNECTED,
     ERROR,
 }
-
-enum class ConnectionError {
-    BLUETOOTH_DISABLED,
-    PERMISSION_DENIED,
-    REGISTRATION_FAILED,
-    CONNECTION_LOST,
-}

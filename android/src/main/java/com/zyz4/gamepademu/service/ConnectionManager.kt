@@ -10,9 +10,11 @@ import com.zyz4.gamepademu.data.SettingsRepository
 import com.zyz4.gamepademu.model.AppSettings
 import com.zyz4.gamepademu.model.ConnectionMode
 import com.zyz4.gamepademu.model.ControllerMode
-import com.zyz4.gamepademu.model.TargetPlatform
-import com.zyz4.gamepademu.proto.Hello
 import com.zyz4.gamepademu.proto.ClientToServer
+import com.zyz4.gamepademu.proto.GamepadInput
+import com.zyz4.gamepademu.proto.GyroCalibration
+import com.zyz4.gamepademu.proto.Hello
+import com.zyz4.gamepademu.proto.ServerToClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -33,13 +35,13 @@ import java.net.InetAddress
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.min
+import kotlin.time.Duration.Companion.milliseconds
 
 data class ConnectionState(
     val connected: Boolean = false,
     val statusText: String = "未启动",
     val batteryLevel: Int = 100,
     val phase: ConnectionPhase = ConnectionPhase.IDLE,
-    val error: ConnectionError? = null,
     val transportType: BluetoothTransportType? = null,
 )
 
@@ -52,8 +54,6 @@ class ConnectionManager @Inject constructor(
 
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
-    val pairedDeviceAddress: StateFlow<String?> = pairingStateRepository.pairedDeviceAddress
-        .stateIn(scope, SharingStarted.Eagerly, null)
     val pairedDeviceName: StateFlow<String?> = pairingStateRepository.pairedDeviceName
         .stateIn(scope, SharingStarted.Eagerly, null)
     private val tcpServer = TcpServerService()
@@ -186,19 +186,19 @@ class ConnectionManager @Inject constructor(
 
         btPhaseJob = scope.launch {
             transport.connectionPhase.collect { phase ->
-                updateBtState(phase, transport.transportType)
+                updateBtState(phase)
             }
         }
     }
 
-    private fun updateBtState(phase: ConnectionPhase, type: BluetoothTransportType) {
+    private fun updateBtState(phase: ConnectionPhase) {
         val (connected, text) = when (phase) {
             ConnectionPhase.IDLE -> false to "未启动"
             ConnectionPhase.REQUESTING_PERMISSIONS -> false to "请求蓝牙权限..."
             ConnectionPhase.REGISTERING_PROFILE -> false to "正在注册 HID 配置文件..."
             ConnectionPhase.RECONNECTING -> false to "正在自动回连已配对设备..."
             ConnectionPhase.LISTENING -> false to "等待主机连接..."
-            ConnectionPhase.DISCOVERABLE -> false to "等待主机连接 — 手机可被发现 (经典蓝牙)"
+            ConnectionPhase.DISCOVERABLE -> false to "等待主机连接 — 手机可被发现 (蓝牙)"
             ConnectionPhase.PAIRING -> false to "正在配对..."
             ConnectionPhase.CONNECTED -> true to "已连接 (蓝牙)"
             ConnectionPhase.DISCONNECTED -> false to "主机已断开"
@@ -232,7 +232,7 @@ class ConnectionManager @Inject constructor(
                     val packet = DatagramPacket(msg, msg.size,
                         InetAddress.getByName("255.255.255.255"), port)
                     socket.send(packet)
-                    delay(3000)
+                    delay(3000.milliseconds)
                 }
             } catch (_: Exception) {}
         }
@@ -270,17 +270,17 @@ class ConnectionManager @Inject constructor(
 
     private fun handleClientMessage(data: ByteArray) {
         try {
-            val msg = com.zyz4.gamepademu.proto.ServerToClient.parseFrom(data)
+            val msg = ServerToClient.parseFrom(data)
             when (msg.payloadCase) {
-                com.zyz4.gamepademu.proto.ServerToClient.PayloadCase.VIBRATION -> {
-                    triggerVibration(msg.vibration.motorSpeed.toInt())
+                ServerToClient.PayloadCase.VIBRATION -> {
+                    triggerVibration(msg.vibration.motorSpeed)
                 }
-                com.zyz4.gamepademu.proto.ServerToClient.PayloadCase.DISCONNECT -> {
+                ServerToClient.PayloadCase.DISCONNECT -> {
                     _connectionState.value = _connectionState.value.copy(
                         connected = false, statusText = "客户端断开"
                     )
                 }
-                com.zyz4.gamepademu.proto.ServerToClient.PayloadCase.SET_CONTROLLER_MODE -> {
+                ServerToClient.PayloadCase.SET_CONTROLLER_MODE -> {
                     val protoMode = msg.setControllerMode.mode
                     val newMode = if (protoMode == com.zyz4.gamepademu.proto.ControllerMode.DS4)
                         ControllerMode.DS4 else ControllerMode.XBOX_360
@@ -289,9 +289,9 @@ class ConnectionManager @Inject constructor(
                     resendHello(newMode)
                     onControllerModeChanged?.invoke(newMode)
                 }
-                com.zyz4.gamepademu.proto.ServerToClient.PayloadCase.START_GYRO_CALIBRATION -> {
+                ServerToClient.PayloadCase.START_GYRO_CALIBRATION -> {
                     val durationMs = msg.startGyroCalibration.durationMs
-                    onGyroCalibrationRequested?.invoke(durationMs.toInt())
+                    onGyroCalibrationRequested?.invoke(durationMs)
                 }
                 else -> {}
             }
@@ -301,12 +301,12 @@ class ConnectionManager @Inject constructor(
     private fun resendHello(mode: ControllerMode) {
         val protoMode = com.zyz4.gamepademu.proto.ControllerMode.forNumber(mode.ordinal)
             ?: com.zyz4.gamepademu.proto.ControllerMode.XBOX_360
-        val hello = com.zyz4.gamepademu.proto.Hello.newBuilder()
+        val hello = Hello.newBuilder()
             .setProtocolVersion(1)
-            .setDeviceName(android.os.Build.MODEL)
+            .setDeviceName(Build.MODEL)
             .setControllerMode(protoMode)
             .build()
-        val msg = com.zyz4.gamepademu.proto.ClientToServer.newBuilder()
+        val msg = ClientToServer.newBuilder()
             .setHello(hello)
             .build()
         scope.launch { tcpServer.send(msg) }
@@ -336,11 +336,11 @@ class ConnectionManager @Inject constructor(
         }
     }
 
-    suspend fun sendGamepadState(state: com.zyz4.gamepademu.proto.GamepadInput) {
+    suspend fun sendGamepadState(state: GamepadInput) {
         when (_settings.value.connectionMode) {
             ConnectionMode.WIFI -> {
                 if (tcpServer.isClientConnected) {
-                    val msg = com.zyz4.gamepademu.proto.ClientToServer.newBuilder()
+                    val msg = ClientToServer.newBuilder()
                         .setGamepadInput(state).build()
                     val start = System.nanoTime()
                     tcpServer.send(msg)
@@ -359,12 +359,12 @@ class ConnectionManager @Inject constructor(
     suspend fun sendGyroCalibration(biasX: Float, biasY: Float, biasZ: Float) {
         if (_settings.value.connectionMode != ConnectionMode.WIFI) return
         if (!tcpServer.isClientConnected) return
-        val cal = com.zyz4.gamepademu.proto.GyroCalibration.newBuilder()
+        val cal = GyroCalibration.newBuilder()
             .setBiasX(biasX)
             .setBiasY(biasY)
             .setBiasZ(biasZ)
             .build()
-        val msg = com.zyz4.gamepademu.proto.ClientToServer.newBuilder()
+        val msg = ClientToServer.newBuilder()
             .setGyroCalibration(cal)
             .build()
         tcpServer.send(msg)

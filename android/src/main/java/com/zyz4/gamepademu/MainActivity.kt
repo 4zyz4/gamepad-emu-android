@@ -28,7 +28,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import androidx.annotation.RequiresApi
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
@@ -45,9 +44,7 @@ import com.zyz4.gamepademu.view.GamepadLayout
 import com.zyz4.gamepademu.view.JoystickView
 import com.zyz4.gamepademu.view.PresetPreviewView
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -150,12 +147,34 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun hapticClick(v: View) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            v.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+        } else {
+            v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+        }
+    }
+
+    private fun hapticTick(v: View) {
+        v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+    }
+
+    private fun hapticLongPress(v: View) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            v.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+        } else {
+            v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+        }
+    }
+
     // ── Gamepad ──────────────────────────────────────────────
 
     private fun setupGamepad() {
         setupTrigger(R.id.btnLT, true)
-        setupBumper(R.id.btnLB, GamepadState.LB)
-        setupBumper(R.id.btnRB, GamepadState.RB)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            setupBumper(R.id.btnLB, GamepadState.LB)
+            setupBumper(R.id.btnRB, GamepadState.RB)
+        }
         setupTrigger(R.id.btnRT, false)
 
         setupDpad(R.id.btnDpadUp, GamepadState.DPAD_UP)
@@ -180,17 +199,17 @@ class MainActivity : ComponentActivity() {
         setupLongPressButton(R.id.btnMenu, GamepadState.START)
     }
 
-    @RequiresApi(Build.VERSION_CODES.R)
     @SuppressLint("ClickableViewAccessibility")
     private fun setupBumper(id: Int, bit: Int) {
         findViewById<Button>(id).setOnTouchListener { v, e ->
             when (e.action) {
                 MotionEvent.ACTION_DOWN -> {
-                    v.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+                    v.performClick()
+                    hapticClick(v)
                     viewModel.onButtonDown(bit); true
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                    v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                    hapticTick(v)
                     viewModel.onButtonUp(bit); true
                 }
                 else -> false
@@ -205,12 +224,13 @@ class MainActivity : ComponentActivity() {
         findViewById<Button>(id).setOnTouchListener { v, e ->
             when (e.action) {
                 MotionEvent.ACTION_DOWN -> {
-                    v.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+                    v.performClick()
+                    hapticClick(v)
                     viewModel.onButtonDown(bit)
                     analogFn(255); true
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                    v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                    hapticTick(v)
                     viewModel.onButtonUp(bit)
                     analogFn(0); true
                 }
@@ -219,15 +239,17 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    @SuppressLint("ClickableViewAccessibility")
     private fun setupDpad(id: Int, dir: Int) {
         findViewById<ImageButton>(id).setOnTouchListener { v, e ->
             when (e.action) {
                 MotionEvent.ACTION_DOWN -> {
-                    v.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+                    v.performClick()
+                    hapticClick(v)
                     viewModel.onDpad(dir); true
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                    v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                    hapticTick(v)
                     viewModel.onDpad(0); true
                 }
                 else -> false
@@ -240,11 +262,12 @@ class MainActivity : ComponentActivity() {
         findViewById<Button>(id).setOnTouchListener { v, e ->
             when (e.action) {
                 MotionEvent.ACTION_DOWN -> {
-                    v.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+                    v.performClick()
+                    hapticClick(v)
                     viewModel.onButtonDown(bit); true
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                    v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                    hapticTick(v)
                     viewModel.onButtonUp(bit); true
                 }
                 else -> false
@@ -252,15 +275,17 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    @SuppressLint("ClickableViewAccessibility")
     private fun setupLongPressButton(id: Int, bit: Int) {
         findViewById<View>(id).setOnTouchListener { v, e ->
             when (e.action) {
                 MotionEvent.ACTION_DOWN -> {
-                    v.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+                    v.performClick()
+                    hapticClick(v)
                     viewModel.onButtonDown(bit); true
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                    v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                    hapticTick(v)
                     viewModel.onButtonUp(bit); true
                 }
                 else -> false
@@ -290,7 +315,6 @@ class MainActivity : ComponentActivity() {
         var firstTapTime = 0L
         var isDoubleClick = false
         var longPressTimer: Runnable? = null
-        var isLongPress = false
 
         val doubleTapTimeout = Runnable {
             firstTapTime = 0
@@ -306,14 +330,14 @@ class MainActivity : ComponentActivity() {
 
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
-                    isLongPress = false
+                    v.performClick()
                     val now = System.currentTimeMillis()
                     if (now - firstTapTime < 300 && firstTapTime > 0) {
                         handler.removeCallbacks(doubleTapTimeout)
                         isDoubleClick = true
                         firstTapTime = 0
 
-                        v.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+                        hapticClick(v)
                         viewModel.onButtonDown(GamepadState.TOUCHPAD_CLICK)
                     } else {
                         firstTapTime = now
@@ -323,9 +347,8 @@ class MainActivity : ComponentActivity() {
                     if (ds4) {
                         viewModel.onTouchpad(sx, sy, true)
                         val timer = Runnable {
-                            isLongPress = true
                             viewModel.calibrateGyro()
-                            v.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                            hapticLongPress(v)
                         }
                         longPressTimer = timer
                         handler.postDelayed(timer, 800)
@@ -491,7 +514,6 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun setupUnpairButton() {
-        val section = findViewById<View>(R.id.sectionPairedDevice)
         val nameView = findViewById<TextView>(R.id.tvPairedDeviceName)
         findViewById<Button>(R.id.btnUnpairDevice).setOnClickListener {
             val deviceName = nameView.text.toString()
@@ -537,6 +559,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    @Suppress("DEPRECATION")
     private fun checkBluetoothOnAndStart() {
         val adapter = BluetoothAdapter.getDefaultAdapter()
         if (adapter != null && !adapter.isEnabled) {
@@ -630,6 +653,7 @@ class MainActivity : ComponentActivity() {
             .show()
     }
 
+    @SuppressLint("SetTextI18n")
     private fun refreshPresetList() {
         val gridView = findViewById<GridView>(R.id.gridPresets)
         val infos = viewModel.presetInfos.value
@@ -652,7 +676,7 @@ class MainActivity : ComponentActivity() {
             val info = infos[position]
             view.findViewById<PresetPreviewView>(R.id.presetPreview).setButtons(info.buttons)
             view.findViewById<TextView>(R.id.presetName).text = info.name
-            view.findViewById<FrameLayout>(R.id.cardBackground).setBackgroundResource(
+            view.findViewById<View>(R.id.cardBackground).setBackgroundResource(
                 if (info.name == currentPresetName) R.drawable.bg_chip_selected else R.drawable.bg_chip
             )
             return view
@@ -663,6 +687,7 @@ class MainActivity : ComponentActivity() {
         android.widget.Toast.makeText(this, msg, android.widget.Toast.LENGTH_SHORT).show()
     }
 
+    @SuppressLint("SetTextI18n")
     private fun updateButtonLabels(mode: DisplayMode) {
         val abxyText = when (mode) {
             DisplayMode.XBOX -> listOf("A", "B", "X", "Y")
@@ -825,6 +850,7 @@ class MainActivity : ComponentActivity() {
                         val nameView = findViewById<TextView>(R.id.tvPairedDeviceName)
                         if (name != null) {
                             section.visibility = View.VISIBLE
+                            @SuppressLint("SetTextI18n")
                             nameView.text = "蓝牙已配对: $name"
                         } else {
                             section.visibility = View.GONE

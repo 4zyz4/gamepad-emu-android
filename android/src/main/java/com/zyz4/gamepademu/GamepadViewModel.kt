@@ -6,7 +6,6 @@ import androidx.lifecycle.viewModelScope
 import com.zyz4.gamepademu.data.LayoutRepository
 import com.zyz4.gamepademu.input.SensorHandler
 import com.zyz4.gamepademu.input.toProto
-import com.zyz4.gamepademu.model.AppSettings
 import com.zyz4.gamepademu.model.ConnectionMode
 import com.zyz4.gamepademu.model.ControllerMode
 import com.zyz4.gamepademu.model.DisplayMode
@@ -23,6 +22,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import kotlin.time.Duration.Companion.milliseconds
 
 @HiltViewModel
 class GamepadViewModel @Inject constructor(
@@ -34,14 +34,9 @@ class GamepadViewModel @Inject constructor(
     val connectionState = connectionManager.connectionState
     val settings = connectionManager.settings
     val pairedDeviceName = connectionManager.pairedDeviceName
-    val pairedDeviceAddress = connectionManager.pairedDeviceAddress
     val isBluetoothRunning: Boolean get() = connectionManager.isBluetoothRunning
 
     private val _gamepadState = MutableStateFlow(GamepadState())
-    val gamepadState: StateFlow<GamepadState> = _gamepadState.asStateFlow()
-
-    private val _showSettings = MutableStateFlow(false)
-    val showSettings: StateFlow<Boolean> = _showSettings.asStateFlow()
 
     private val _displayMode = MutableStateFlow(DisplayMode.XBOX)
     val displayMode: StateFlow<DisplayMode> = _displayMode.asStateFlow()
@@ -49,16 +44,12 @@ class GamepadViewModel @Inject constructor(
     private val _currentPreset = MutableStateFlow(LayoutPreset())
     val currentPreset: StateFlow<LayoutPreset> = _currentPreset.asStateFlow()
 
-    private val _presetList = MutableStateFlow<List<String>>(emptyList())
-    val presetList: StateFlow<List<String>> = _presetList.asStateFlow()
-
     data class PresetInfo(val name: String, val buttons: List<ButtonPosition>)
 
     private val _presetInfos = MutableStateFlow<List<PresetInfo>>(emptyList())
     val presetInfos: StateFlow<List<PresetInfo>> = _presetInfos.asStateFlow()
 
     private val _selectedButtonId = MutableStateFlow<String?>(null)
-    val selectedButtonId: StateFlow<String?> = _selectedButtonId.asStateFlow()
 
     private val sensorHandler = SensorHandler(app)
     private var sendJob: Job? = null
@@ -146,9 +137,7 @@ class GamepadViewModel @Inject constructor(
     }
 
     private fun refreshPresetList() {
-        val names = layoutRepository.listPresets()
-        _presetList.value = names
-        _presetInfos.value = names.map { name ->
+        _presetInfos.value = layoutRepository.listPresets().map { name ->
             val preset = layoutRepository.loadPreset(name)
             PresetInfo(name = name, buttons = preset?.buttons ?: emptyList())
         }
@@ -159,13 +148,6 @@ class GamepadViewModel @Inject constructor(
         _currentPreset.value = loaded
         connectionManager.updateSettings(settings.value.copy(currentPresetName = name))
         return true
-    }
-
-    fun savePreset(name: String) {
-        val preset = _currentPreset.value
-        layoutRepository.savePreset(name, preset)
-        connectionManager.updateSettings(settings.value.copy(currentPresetName = name))
-        refreshPresetList()
     }
 
     fun savePreset(name: String, preset: LayoutPreset) {
@@ -207,10 +189,6 @@ class GamepadViewModel @Inject constructor(
 
     fun setSelectedButtonId(id: String?) {
         _selectedButtonId.value = id
-    }
-
-    fun toggleSettings() {
-        _showSettings.value = !_showSettings.value
     }
 
     fun updateDisplayMode(mode: DisplayMode) {
@@ -269,7 +247,7 @@ class GamepadViewModel @Inject constructor(
                 connectionManager.sendGamepadState(input)
                 val elapsed = (System.nanoTime() - frameStart) / 1_000_000L
                 val remaining = connectionManager.pollingIntervalMs.value.toLong() - elapsed
-                if (remaining > 0) delay(remaining)
+                if (remaining > 0) delay(remaining.milliseconds)
             }
         }
     }
@@ -297,7 +275,7 @@ class GamepadViewModel @Inject constructor(
                 connectionManager.sendGamepadState(input)
                 val elapsed = (System.nanoTime() - frameStart) / 1_000_000L
                 val remaining = connectionManager.pollingIntervalMs.value.toLong() - elapsed
-                if (remaining > 0) delay(remaining)
+                if (remaining > 0) delay(remaining.milliseconds)
             }
         }
     }
