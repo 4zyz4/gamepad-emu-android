@@ -8,14 +8,16 @@ plugins {
 
 android {
     namespace = "com.zyz4.gamepademu"
+    //noinspection GradleDependency
     compileSdk = 36
 
     defaultConfig {
         applicationId = "com.zyz4.gamepademu"
         minSdk = 26
+        //noinspection OldTargetApi
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.0.1"
     }
 
     buildTypes {
