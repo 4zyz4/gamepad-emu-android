@@ -313,6 +313,8 @@ class MainActivity : ComponentActivity() {
         val area = findViewById<FrameLayout>(R.id.centerArea)
         val handler = Handler(Looper.getMainLooper())
         var firstTapTime = 0L
+        var firstTapX = 0f
+        var firstTapY = 0f
         var isDoubleClick = false
         var longPressTimer: Runnable? = null
 
@@ -341,6 +343,8 @@ class MainActivity : ComponentActivity() {
                         viewModel.onButtonDown(GamepadState.TOUCHPAD_CLICK)
                     } else {
                         firstTapTime = now
+                        firstTapX = event.x
+                        firstTapY = event.y
                         isDoubleClick = false
                         handler.postDelayed(doubleTapTimeout, 300)
                     }
@@ -356,6 +360,14 @@ class MainActivity : ComponentActivity() {
                     true
                 }
                 MotionEvent.ACTION_MOVE -> {
+                    if (firstTapTime != 0L) {
+                        val dx = event.x - firstTapX
+                        val dy = event.y - firstTapY
+                        if (dx * dx + dy * dy > 30f * 30f) {
+                            firstTapTime = 0
+                            handler.removeCallbacks(doubleTapTimeout)
+                        }
+                    }
                     if (ds4) {
                         viewModel.onTouchpad(sx, sy, true)
                         longPressTimer?.let { handler.removeCallbacks(it) }

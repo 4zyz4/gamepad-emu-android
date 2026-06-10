@@ -243,7 +243,7 @@ class GamepadViewModel @Inject constructor(
         sendJob = viewModelScope.launch {
             while (true) {
                 val frameStart = System.nanoTime()
-                val input = _gamepadState.value.toProto(settings.value.controllerMode)
+                val input = _gamepadState.value.toProto()
                 connectionManager.sendGamepadState(input)
                 val elapsed = (System.nanoTime() - frameStart) / 1_000_000L
                 val remaining = connectionManager.pollingIntervalMs.value.toLong() - elapsed
@@ -271,7 +271,7 @@ class GamepadViewModel @Inject constructor(
                     accelX = sensor.accelX,
                     accelY = sensor.accelY,
                     accelZ = sensor.accelZ,
-                ).toProto(settings.value.controllerMode)
+                ).toProto()
                 connectionManager.sendGamepadState(input)
                 val elapsed = (System.nanoTime() - frameStart) / 1_000_000L
                 val remaining = connectionManager.pollingIntervalMs.value.toLong() - elapsed
@@ -329,7 +329,7 @@ class GamepadViewModel @Inject constructor(
     private fun sendInput() {
         if (settings.value.connectionMode == ConnectionMode.BLUETOOTH) return
         viewModelScope.launch {
-            val input = _gamepadState.value.toProto(settings.value.controllerMode)
+            val input = _gamepadState.value.toProto()
             connectionManager.sendGamepadState(input)
         }
     }

@@ -48,6 +48,8 @@ class JoystickView @JvmOverloads constructor(
 
     private var isTouching = false
     private var firstTapTime = 0L
+    private var firstTapX = 0f
+    private var firstTapY = 0f
     private var isDoubleClick = false
     private val handler = Handler(Looper.getMainLooper())
     private val doubleTapTimeout = Runnable { firstTapTime = 0 }
@@ -82,6 +84,8 @@ class JoystickView @JvmOverloads constructor(
                     onStickClickDown?.invoke()
                 } else {
                     firstTapTime = now
+                    firstTapX = event.x
+                    firstTapY = event.y
                     isDoubleClick = false
                     handler.postDelayed(doubleTapTimeout, 300)
                 }
@@ -92,6 +96,14 @@ class JoystickView @JvmOverloads constructor(
             MotionEvent.ACTION_MOVE -> {
                 if (isTouching) {
                     moveKnob(event.x, event.y)
+                }
+                if (firstTapTime != 0L) {
+                    val dx = event.x - firstTapX
+                    val dy = event.y - firstTapY
+                    if (sqrt(dx * dx + dy * dy) > 30f) {
+                        firstTapTime = 0
+                        handler.removeCallbacks(doubleTapTimeout)
+                    }
                 }
                 return true
             }
