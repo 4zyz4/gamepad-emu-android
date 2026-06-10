@@ -45,6 +45,7 @@ class TcpServerService {
                 isClientConnected = false
                 onClientDisconnected()
             } catch (_: java.net.SocketTimeoutException) {
+            } catch (_: java.net.SocketException) {
             }
         }
     }

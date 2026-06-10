@@ -154,10 +154,11 @@ class GamepadViewModel @Inject constructor(
         }
     }
 
-    fun loadPreset(name: String) {
-        val loaded = layoutRepository.loadPreset(name) ?: return
+    fun loadPreset(name: String): Boolean {
+        val loaded = layoutRepository.loadPreset(name) ?: return false
         _currentPreset.value = loaded
         connectionManager.updateSettings(settings.value.copy(currentPresetName = name))
+        return true
     }
 
     fun savePreset(name: String) {
@@ -177,6 +178,7 @@ class GamepadViewModel @Inject constructor(
     fun saveCurrentPreset() {
         val name = settings.value.currentPresetName
         layoutRepository.savePreset(name, _currentPreset.value)
+        refreshPresetList()
     }
 
     fun deletePreset(name: String) {

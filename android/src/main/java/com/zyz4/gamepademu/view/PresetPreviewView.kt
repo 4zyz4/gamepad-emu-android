@@ -12,8 +12,12 @@ class PresetPreviewView @JvmOverloads constructor(
 ) : View(context, attrs, defStyleAttr) {
 
     private var buttons: List<ButtonPosition> = emptyList()
-    private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    private val circlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = -0x555556
+        style = Paint.Style.FILL
+    }
+    private val rectPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = -0x444445
         style = Paint.Style.FILL
     }
 
@@ -40,10 +44,22 @@ class PresetPreviewView @JvmOverloads constructor(
 
         for (btn in buttons) {
             if (!btn.visible) continue
-            val cx = offsetX + (btn.x + btn.width / 2f) * scale
-            val cy = offsetY + (btn.y + btn.height / 2f) * scale
-            val r = (minOf(btn.width, btn.height) * scale * 0.35f).coerceAtLeast(2f)
-            canvas.drawCircle(cx, cy, r, paint)
+            val bx = offsetX + btn.x * scale
+            val by = offsetY + btn.y * scale
+            val bw = btn.width * scale
+            val bh = btn.height * scale
+            if (btn.lockAspect) {
+                val cx = bx + bw / 2f
+                val cy = by + bh / 2f
+                val r = (minOf(btn.width, btn.height) * scale * 0.35f).coerceAtLeast(2f)
+                canvas.drawCircle(cx, cy, r, circlePaint)
+            } else {
+                val r = 2f * density
+                canvas.drawRoundRect(bx, by, bx + bw, by + bh, r, r, rectPaint)
+            }
         }
     }
+
+    private val density: Float
+        get() = context.resources.displayMetrics.density
 }

@@ -17,6 +17,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -126,12 +127,14 @@ class ConnectionManager @Inject constructor(
         try {
             startBroadcast(settings.deviceName, port)
             _connectionState.value = _connectionState.value.copy(
+                phase = ConnectionPhase.LISTENING,
                 statusText = "服务已启动，等待客户端连接..."
             )
             tcpServer.start(port,
                 onClientConnected = {
                     _connectionState.value = _connectionState.value.copy(
-                        connected = true, statusText = "已连接 (WiFi)"
+                        connected = true, phase = ConnectionPhase.CONNECTED,
+                        statusText = "已连接 (WiFi)"
                     )
                     val protoMode = com.zyz4.gamepademu.proto.ControllerMode.forNumber(
                         settings.controllerMode.ordinal
@@ -148,14 +151,17 @@ class ConnectionManager @Inject constructor(
                 },
                 onClientDisconnected = {
                     _connectionState.value = _connectionState.value.copy(
-                        connected = false, statusText = "客户端已断开"
+                        connected = false, phase = ConnectionPhase.DISCONNECTED,
+                        statusText = "客户端已断开"
                     )
                 },
                 onMessage = { data -> handleClientMessage(data) }
             )
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             _connectionState.value = _connectionState.value.copy(
-                connected = false, statusText = "服务异常: ${e.message}"
+                connected = false, phase = ConnectionPhase.ERROR,
+                statusText = "服务异常: ${e.message}"
             )
         }
     }
@@ -191,6 +197,7 @@ class ConnectionManager @Inject constructor(
             ConnectionPhase.REQUESTING_PERMISSIONS -> false to "请求蓝牙权限..."
             ConnectionPhase.REGISTERING_PROFILE -> false to "正在注册 HID 配置文件..."
             ConnectionPhase.RECONNECTING -> false to "正在自动回连已配对设备..."
+            ConnectionPhase.LISTENING -> false to "等待主机连接..."
             ConnectionPhase.DISCOVERABLE -> false to "等待主机连接 — 手机可被发现 (经典蓝牙)"
             ConnectionPhase.PAIRING -> false to "正在配对..."
             ConnectionPhase.CONNECTED -> true to "已连接 (蓝牙)"

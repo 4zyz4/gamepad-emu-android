@@ -377,7 +377,7 @@ class MainActivity : ComponentActivity() {
     private fun selectSettingsCategory(index: Int) {
         val pages = listOf(R.id.pageConnection, R.id.pagePresets)
         val buttons = listOf(
-            R.id.btnCategoryPresets, R.id.btnCategoryConnection
+            R.id.btnCategoryConnection, R.id.btnCategoryPresets
         )
         pages.forEachIndexed { i, id ->
             findViewById<View>(id).visibility = if (i == index) View.VISIBLE else View.GONE
@@ -507,7 +507,7 @@ class MainActivity : ComponentActivity() {
     private fun setupConnectionPage() {
         findViewById<Button>(R.id.btnConnectAction).setOnClickListener {
             val st = viewModel.connectionState.value
-            if (st.connected) {
+            if (st.phase != com.zyz4.gamepademu.service.ConnectionPhase.IDLE) {
                 viewModel.stopServer()
             } else {
                 val s = viewModel.settings.value
@@ -548,7 +548,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun loadPresetByName(name: String) {
-        viewModel.loadPreset(name)
+        if (!viewModel.loadPreset(name)) return
         val preset = viewModel.currentPreset.value
         gamepadLayout.loadPreset(preset)
         showToast("已加载「$name」")
@@ -766,7 +766,7 @@ class MainActivity : ComponentActivity() {
                         findViewById<TextView>(R.id.centerText).text = st.statusText
                         findViewById<TextView>(R.id.tvConnectionStatus).text = st.statusText
                         val btn = findViewById<Button>(R.id.btnConnectAction)
-                        btn.text = if (st.connected) "停止服务" else "启动服务"
+                        btn.text = if (st.phase != com.zyz4.gamepademu.service.ConnectionPhase.IDLE) "停止服务" else "启动服务"
                         val ip = if (viewModel.settings.value.connectionMode == ConnectionMode.WIFI &&
                             st.statusText != "未启动"
                         ) {
