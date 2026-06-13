@@ -2,6 +2,7 @@ package com.zyz4.gamepademu.service
 
 import android.content.Context
 import android.os.Build
+import android.os.SystemClock
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
@@ -34,7 +35,6 @@ import java.net.DatagramSocket
 import java.net.InetAddress
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlin.math.min
 import kotlin.time.Duration.Companion.milliseconds
 
 data class ConnectionState(
@@ -215,9 +215,8 @@ class ConnectionManager @Inject constructor(
         if (data.size < 8) return
         val leftMotor = data[1].toInt() and 0xFF
         val rightMotor = data[2].toInt() and 0xFF
-        val speed = min(255, (leftMotor + rightMotor) / 2)
-        if (speed > 0) {
-            triggerVibration(speed)
+        if (leftMotor > 0 || rightMotor > 0) {
+            triggerVibration(leftMotor, rightMotor)
         }
     }
 
@@ -273,7 +272,8 @@ class ConnectionManager @Inject constructor(
             val msg = ServerToClient.parseFrom(data)
             when (msg.payloadCase) {
                 ServerToClient.PayloadCase.VIBRATION -> {
-                    triggerVibration(msg.vibration.motorSpeed)
+                    val v = msg.vibration
+                    triggerVibration(v.largeMotor, v.smallMotor)
                 }
                 ServerToClient.PayloadCase.DISCONNECT -> {
                     _connectionState.value = _connectionState.value.copy(
@@ -312,12 +312,29 @@ class ConnectionManager @Inject constructor(
         scope.launch { tcpServer.send(msg) }
     }
 
-    fun triggerVibration(speed: Int) {
-        val amplitude = min(255, speed).let { s ->
-            if (s < 1) return
-            (s * VibrationEffect.DEFAULT_AMPLITUDE / 255).coerceAtLeast(1)
+    private var _vibSpeed = -1
+    private var _vibEndTime = 0L
+
+    fun triggerVibration(largeMotor: Int, smallMotor: Int) {
+        val speed = maxOf(largeMotor, smallMotor).coerceIn(0, 255)
+        if (speed < 1) {
+            vibrator.cancel()
+            _vibSpeed = -1
+            return
         }
-        val effect = VibrationEffect.createOneShot(50, amplitude)
+        val amplitude = (speed * VibrationEffect.DEFAULT_AMPLITUDE / 255).coerceAtLeast(1)
+        val interval = _pollingIntervalMs.value
+        val duration = (interval * 2).coerceIn(20, 500).toLong()
+        val now = SystemClock.uptimeMillis()
+
+        if (speed == _vibSpeed && now < _vibEndTime) {
+            _vibEndTime = now + duration
+            return
+        }
+
+        _vibSpeed = speed
+        _vibEndTime = now + duration
+        val effect = VibrationEffect.createOneShot(duration, amplitude)
         vibrator.cancel()
         vibrator.vibrate(effect)
     }

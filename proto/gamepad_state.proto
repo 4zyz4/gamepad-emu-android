@@ -87,7 +87,8 @@ message ServerToClient {
 }
 
 message Vibration {
-  uint32 motor_speed = 1;
+  uint32 large_motor = 1;
+  uint32 small_motor = 2;
 }
 
 message Ack {
