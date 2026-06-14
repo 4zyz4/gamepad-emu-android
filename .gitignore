@@ -57,6 +57,9 @@ obj/
 
 # Other
 *.keystore
+/sign/
+*.pem
+*.p12
 
 # Proto generated sources
 **/generated/
