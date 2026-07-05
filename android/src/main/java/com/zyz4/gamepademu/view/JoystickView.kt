@@ -77,8 +77,11 @@ class JoystickView @JvmOverloads constructor(
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        when (event.actionMasked) {
-            MotionEvent.ACTION_DOWN -> {
+        val action = event.actionMasked
+        val pointerIndex = event.actionIndex
+        
+        when (action) {
+            MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
                 val now = System.currentTimeMillis()
                 if (now - firstTapTime < 300 && firstTapTime > 0) {
                     handler.removeCallbacks(doubleTapTimeout)
@@ -89,22 +92,25 @@ class JoystickView @JvmOverloads constructor(
                     onStickClickDown?.invoke()
                 } else {
                     firstTapTime = now
-                    firstTapX = event.x
-                    firstTapY = event.y
+                    firstTapX = event.getX(pointerIndex)
+                    firstTapY = event.getY(pointerIndex)
                     isDoubleClick = false
                     handler.postDelayed(doubleTapTimeout, 300)
                 }
                 isTouching = true
-                moveKnob(event.x, event.y)
+                moveKnob(event.getX(pointerIndex), event.getY(pointerIndex))
                 return true
             }
             MotionEvent.ACTION_MOVE -> {
                 if (isTouching) {
-                    moveKnob(event.x, event.y)
+                    // Handle all pointers in a move event
+                    for (i in 0 until event.pointerCount) {
+                        moveKnob(event.getX(i), event.getY(i))
+                    }
                 }
                 if (firstTapTime != 0L) {
-                    val dx = event.x - firstTapX
-                    val dy = event.y - firstTapY
+                    val dx = event.getX(pointerIndex) - firstTapX
+                    val dy = event.getY(pointerIndex) - firstTapY
                     if (sqrt(dx * dx + dy * dy) > 30f) {
                         firstTapTime = 0
                         handler.removeCallbacks(doubleTapTimeout)
@@ -112,7 +118,7 @@ class JoystickView @JvmOverloads constructor(
                 }
                 return true
             }
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP, MotionEvent.ACTION_CANCEL -> {
                 isTouching = false
                 isClicking = false
                 knobX = centerX
